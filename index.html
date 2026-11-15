@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>השבוע שלי</title>
+  <meta name="description" content="יומן שבועי קטן שמחכה על החוף" />
+  <meta name="theme-color" content="#8a9db2" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='%23a9b2c6'/><stop offset='.6' stop-color='%23efc9ac'/><stop offset='1' stop-color='%23f8dcae'/></linearGradient></defs><rect width='64' height='64' rx='16' fill='url(%23g)'/><circle cx='32' cy='38' r='11' fill='%23fff4d6'/><rect y='38' width='64' height='26' rx='0' fill='%237f93a3'/><path d='M0 50 L64 50 L64 64 L0 64Z' fill='%23e3c9a3'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Assistant:wght@300;400;600&family=Frank+Ruhl+Libre:wght@300;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="locked">
+
+  <!-- ============ HERO / SCENE ============ -->
+  <section class="hero" aria-label="השבוע שלי">
+    <svg class="scene" viewBox="0 0 1440 560" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="300" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#7b90a8" />
+          <stop offset=".34" stop-color="#a7b0c4" />
+          <stop offset=".6" stop-color="#d2bec6" />
+          <stop offset=".82" stop-color="#eec8ad" />
+          <stop offset="1" stop-color="#f7dbad" />
+        </linearGradient>
+        <radialGradient id="sunGlow">
+          <stop offset="0" stop-color="#fff6dc" stop-opacity="1" />
+          <stop offset=".25" stop-color="#fbe1b4" stop-opacity=".8" />
+          <stop offset=".6" stop-color="#f3c69c" stop-opacity=".25" />
+          <stop offset="1" stop-color="#f3c69c" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="cloudLav">
+          <stop offset="0" stop-color="#c9c3d3" stop-opacity=".95" />
+          <stop offset="1" stop-color="#c9c3d3" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="cloudPeach">
+          <stop offset="0" stop-color="#f6d6c0" stop-opacity=".95" />
+          <stop offset="1" stop-color="#f6d6c0" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="sea" x1="0" y1="300" x2="0" y2="392" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#8d9fb0" />
+          <stop offset=".45" stop-color="#71879a" />
+          <stop offset=".85" stop-color="#8e9fa9" />
+          <stop offset="1" stop-color="#b9b2a6" />
+        </linearGradient>
+        <linearGradient id="ground" x1="0" y1="390" x2="0" y2="560" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#e2c7a3" />
+          <stop offset=".5" stop-color="#ecd7b9" />
+          <stop offset="1" stop-color="#f3e6d2" />
+        </linearGradient>
+        <linearGradient id="duneL" x1="0" y1="320" x2="300" y2="560" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#cfae85" />
+          <stop offset="1" stop-color="#b8916a" />
+        </linearGradient>
+        <linearGradient id="duneR" x1="1440" y1="320" x2="1140" y2="560" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#d7b78f" />
+          <stop offset="1" stop-color="#c29c74" />
+        </linearGradient>
+        <radialGradient id="warm" cx="900" cy="300" r="900" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ffd9a0" stop-opacity=".45" />
+          <stop offset="1" stop-color="#ffd9a0" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="fade" x1="0" y1="500" x2="0" y2="560" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#f3e9dc" stop-opacity="0" />
+          <stop offset="1" stop-color="#f3e9dc" stop-opacity="1" />
+        </linearGradient>
+      </defs>
+
+      <rect width="1440" height="560" fill="url(#sky)" />
+
+      <g class="clouds">
+        <ellipse cx="260" cy="70" rx="330" ry="22" fill="url(#cloudLav)" />
+        <ellipse cx="1180" cy="110" rx="380" ry="18" fill="url(#cloudLav)" />
+        <ellipse cx="620" cy="150" rx="420" ry="16" fill="url(#cloudLav)" />
+        <ellipse cx="980" cy="200" rx="300" ry="12" fill="url(#cloudPeach)" />
+        <ellipse cx="300" cy="230" rx="360" ry="10" fill="url(#cloudPeach)" />
+        <ellipse cx="1300" cy="250" rx="240" ry="9" fill="url(#cloudPeach)" />
+      </g>
+
+      <g class="birds" fill="none" stroke="#5c5b70" stroke-width="1.6" stroke-linecap="round">
+        <path class="bird" d="M0,0 q6,-6 12,0 q6,-6 12,0" transform="translate(470 120)" />
+        <path class="bird b2" d="M0,0 q5,-5 10,0 q5,-5 10,0" transform="translate(505 136)" />
+        <path class="bird b3" d="M0,0 q4,-4 8,0 q4,-4 8,0" transform="translate(445 142)" />
+      </g>
+
+      <circle cx="900" cy="300" r="240" fill="url(#sunGlow)" class="glow" />
+      <circle cx="900" cy="300" r="40" fill="#fff3d4" />
+
+      <rect y="300" width="1440" height="100" fill="url(#sea)" />
+      <rect y="299" width="1440" height="1.5" fill="#f6dcb6" opacity=".7" />
+      <g id="glints"></g>
+      <g id="foam"></g>
+
+      <rect y="390" width="1440" height="170" fill="url(#ground)" />
+      <g id="ripples" fill="none" stroke="#fff8ec" stroke-linecap="round" opacity=".55"></g>
+
+      <path d="M0,328 C200,320 420,352 620,385 C660,391 690,395 702,397 C640,450 560,510 470,560 L0,560 Z" fill="url(#duneL)" />
+      <path d="M1440,322 C1240,316 1020,350 820,385 C780,391 750,395 738,397 C800,450 900,510 1000,560 L1440,560 Z" fill="url(#duneR)" />
+
+      <g id="fence"></g>
+      <g id="grass"></g>
+
+      <rect width="1440" height="560" fill="url(#warm)" style="mix-blend-mode: screen" />
+      <rect y="500" width="1440" height="60" fill="url(#fade)" />
+    </svg>
+
+    <div class="motes" id="motes" aria-hidden="true"></div>
+
+    <div class="hero-top">
+      <div class="user" id="userChip" hidden></div>
+    </div>
+
+    <div class="hero-text">
+      <p class="eyebrow" id="greeting"></p>
+      <h1 class="title">השבוע שלי</h1>
+      <p class="quote" id="quote"></p>
+    </div>
+
+    <!-- login gate -->
+    <div class="gate" id="gate" data-state="loading">
+      <div class="gate-card">
+        <p class="eyebrow">ברוכה הבאה ל־</p>
+        <h1 class="title">השבוע שלי</h1>
+        <p class="gate-sub">יומן שבועי קטן שמחכה לך על החוף. מתכננים, מסמנים, נושמים.</p>
+        <div class="gate-actions">
+          <button class="google-btn" id="googleBtn" type="button">
+            <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            <span>כניסה עם Google</span>
+          </button>
+          <button class="link-btn" id="localBtn" type="button">או להמשיך בלי חשבון · נשמר רק במכשיר הזה</button>
+        </div>
+        <div class="gate-loading" aria-live="polite"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PLANNER ============ -->
+  <main class="paper">
+    <div class="toolbar">
+      <nav class="week-nav" aria-label="ניווט בין שבועות">
+        <button class="round-btn" id="prevWeek" aria-label="שבוע קודם">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="week-label">
+          <h2 id="weekRange"></h2>
+          <button class="link-btn small" id="thisWeek">חזרה לשבוע הזה</button>
+        </div>
+        <button class="round-btn" id="nextWeek" aria-label="שבוע הבא">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </nav>
+
+      <div class="steps" aria-live="polite">
+        <div class="footprints" id="footprints"></div>
+        <p class="steps-text" id="progressText"></p>
+      </div>
+    </div>
+
+    <div class="board">
+      <section class="days" id="days"></section>
+
+      <aside class="side">
+        <div class="card goals-card">
+          <h3>מטרות השבוע</h3>
+          <ul class="goals" id="goals"></ul>
+          <form class="goal-form" id="goalForm">
+            <input id="goalInput" type="text" maxlength="80" placeholder="מטרה חדשה…" autocomplete="off" />
+            <button type="submit" aria-label="הוספת מטרה">+</button>
+          </form>
+        </div>
+
+        <div class="card note-card">
+          <h3>פתק לעצמי</h3>
+          <textarea id="note" rows="6" placeholder="מחשבות, תזכורות, דברים קטנים שמשמחים אותי…"></textarea>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="colophon">
+      <span id="syncState"></span>
+    </footer>
+  </main>
+
+  <!-- ============ POSTCARD DIALOG ============ -->
+  <dialog id="taskDialog" class="postcard">
+    <form method="dialog" id="taskForm">
+      <div class="stamp" aria-hidden="true"><i></i></div>
+      <p class="pc-eyebrow" id="dialogDay"></p>
+      <h3 id="dialogTitle">משימה חדשה</h3>
+
+      <label class="field">
+        <span>מה עושים?</span>
+        <input id="taskTitle" type="text" maxlength="80" required autocomplete="off" placeholder="למשל: מבחן במתמטיקה" />
+      </label>
+
+      <div class="row">
+        <label class="field">
+          <span>שעה</span>
+          <input id="taskTime" type="time" />
+        </label>
+        <label class="field">
+          <span>יום</span>
+          <select id="taskDay"></select>
+        </label>
+      </div>
+
+      <div class="field">
+        <span>קטגוריה</span>
+        <div class="chips" id="catChips"></div>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="link-btn danger" id="deleteTask">מחיקה</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" id="cancelTask">ביטול</button>
+        <button type="submit" class="btn primary">שמירה</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

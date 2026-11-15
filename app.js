@@ -82,6 +82,91 @@ function gregRange(a, b) {
   return `${a.getDate()} ב${MONTHS[a.getMonth()]} – ${b.getDate()} ב${MONTHS[b.getMonth()]} ${b.getFullYear()}`;
 }
 
+// ---- Jewish holidays (Israel schedule), computed from the Hebrew date ----
+const holidayCache = new Map();
+function holidayFor(d) {
+  const k = keyOf(d);
+  if (holidayCache.has(k)) return holidayCache.get(k);
+  const v = computeHoliday(d);
+  holidayCache.set(k, v);
+  return v;
+}
+function computeHoliday(d) {
+  const { day, month } = heb(d);
+  const wd = d.getDay(); // 0 = Sunday … 6 = Shabbat
+  const H = (name, major = false) => ({ name, major });
+
+  // Hanukkah: 25 Kislev + 7 days (crosses into Tevet)
+  for (let n = 0; n < 8; n++) {
+    const h = heb(addDays(d, -n));
+    if (h.month === "כסלו" && h.day === 25) return H(`חנוכה · יום ${gematria(n + 1)}`);
+  }
+
+  switch (month) {
+    case "תשרי":
+      if (day === 1 || day === 2) return H("ראש השנה", true);
+      if ((day === 3 && wd !== 6) || (day === 4 && wd === 0)) return H("צום גדליה");
+      if (day === 9) return H("ערב יום כיפור");
+      if (day === 10) return H("יום כיפור", true);
+      if (day === 14) return H("ערב סוכות");
+      if (day === 15) return H("סוכות", true);
+      if (day >= 16 && day <= 20) return H("חול המועד סוכות");
+      if (day === 21) return H("הושענא רבה");
+      if (day === 22) return H("שמחת תורה", true);
+      break;
+    case "כסלו":
+      if (day === 24) return H("ערב חנוכה");
+      break;
+    case "טבת":
+      if (day === 10) return H("עשרה בטבת");
+      break;
+    case "שבט":
+      if (day === 15) return H("ט״ו בשבט");
+      break;
+    case "אדר א׳":
+      if (day === 14) return H("פורים קטן");
+      break;
+    case "אדר":
+    case "אדר ב׳":
+      if ((day === 13 && wd !== 6) || (day === 11 && wd === 4)) return H("תענית אסתר");
+      if (day === 14) return H("פורים", true);
+      if (day === 15) return H("שושן פורים");
+      break;
+    case "ניסן":
+      if (day === 14) return H("ערב פסח");
+      if (day === 15) return H("פסח", true);
+      if (day >= 16 && day <= 20) return H("חול המועד פסח");
+      if (day === 21) return H("שביעי של פסח", true);
+      if ((day === 27 && wd !== 5 && wd !== 0) || (day === 26 && wd === 4) || (day === 28 && wd === 1)) return H("יום השואה");
+      break;
+    case "אייר": {
+      // Independence Day moves so it never touches Shabbat
+      const w5 = addDays(d, 5 - day).getDay();
+      const atz = w5 === 5 ? 4 : w5 === 6 ? 3 : w5 === 1 ? 6 : 5;
+      if (day === atz - 1) return H("יום הזיכרון");
+      if (day === atz) return H("יום העצמאות", true);
+      if (day === 18) return H("ל״ג בעומר");
+      if (day === 28) return H("יום ירושלים");
+      break;
+    }
+    case "סיוון":
+      if (day === 5) return H("ערב שבועות");
+      if (day === 6) return H("שבועות", true);
+      break;
+    case "תמוז":
+      if ((day === 17 && wd !== 6) || (day === 18 && wd === 0)) return H("י״ז בתמוז");
+      break;
+    case "אב":
+      if ((day === 9 && wd !== 6) || (day === 10 && wd === 0)) return H("תשעה באב");
+      if (day === 15) return H("ט״ו באב");
+      break;
+    case "אלול":
+      if (day === 29) return H("ערב ראש השנה");
+      break;
+  }
+  return null;
+}
+
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -349,6 +434,27 @@ function watchVisible() {
   }
 }
 
+// ---- shared events: /shared/{id}, visible to everyone in `participants` (emails) ----
+let shared = [];
+let sharedUnsub = null;
+const myEmail = () => ((user && user.email) || "").toLowerCase();
+const shortEmail = (e) => String(e || "").split("@")[0];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function stopShared() {
+  if (sharedUnsub) { sharedUnsub(); sharedUnsub = null; }
+  shared = [];
+}
+function watchShared() {
+  stopShared();
+  if (mode !== "cloud" || !myEmail()) return;
+  const q = fb.query(fb.collection(fb.db, "shared"), fb.where("participants", "array-contains", myEmail()));
+  sharedUnsub = fb.onSnapshot(q,
+    (snap) => { shared = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); },
+    (err) => { console.error("shared events", err); });
+}
+const sharedOn = (date) => { const k = keyOf(date); return shared.filter((e) => e.date === k); };
+
 async function migrateLocalToCloud() {
   const flag = `beachPlanner.migrated.${user.uid}`;
   if (lsGet(flag)) return;
@@ -388,6 +494,8 @@ async function initFirebase() {
     signInWithRedirect: authM.signInWithRedirect,
     signOut: authM.signOut,
     doc: fsM.doc, getDoc: fsM.getDoc, setDoc: fsM.setDoc, onSnapshot: fsM.onSnapshot, serverTimestamp: fsM.serverTimestamp,
+    collection: fsM.collection, query: fsM.query, where: fsM.where,
+    addDoc: fsM.addDoc, updateDoc: fsM.updateDoc, deleteDoc: fsM.deleteDoc, arrayRemove: fsM.arrayRemove,
   };
   authM.getRedirectResult(auth).catch((e) => console.warn(e));
 
@@ -400,9 +508,11 @@ async function initFirebase() {
       await migrateLocalToCloud();
       enterApp();
       watchVisible();
+      watchShared();
     } else {
       user = null;
       stopWatching();
+      stopShared();
       if (lsGet(MODE_KEY) === "local") enterLocal();
       else showGate();
     }
@@ -566,6 +676,28 @@ function renderProgress(all, scope) {
     : `${done} מתוך ${all.length} צעדים על החוף`;
 }
 
+// personal tasks + shared events for one day, by time
+function dayItems(tasks, events) {
+  return [...tasks.map((t) => ({ t, time: t.time })), ...events.map((e) => ({ e, time: e.time }))]
+    .sort((a, b) => (a.time || "99:99").localeCompare(b.time || "99:99"));
+}
+
+const peopleIcon = () => {
+  const s = svg("svg", { viewBox: "0 0 24 24", class: "ppl", "aria-hidden": "true" });
+  s.append(svg("circle", { cx: 9, cy: 8.5, r: 3.2 }));
+  s.append(svg("circle", { cx: 16.6, cy: 9.6, r: 2.5 }));
+  s.append(svg("path", { d: "M3.5 19.5c.6-3.3 2.9-5 5.5-5s4.9 1.7 5.5 5M14.6 14.6c.6-.3 1.3-.4 2-.4 2.2 0 3.9 1.5 4.4 4.3" }));
+  return s;
+};
+
+function sharedWho(ev) {
+  if (ev.ownerUid === (user && user.uid)) {
+    const others = (ev.participants || []).filter((p) => p !== myEmail());
+    return others.length ? `עם ${others.map(shortEmail).join(", ")}` : "משותף";
+  }
+  return `מאת ${ev.ownerName || shortEmail(ev.ownerEmail)}`;
+}
+
 function renderMonth() {
   const now = new Date();
   const todayKey = keyOf(now);
@@ -597,39 +729,48 @@ function renderMonth() {
       const date = addDays(ws, i);
       const inMonth = date >= monthStart && date < next;
       const tasks = sortTasks(w.days[i]);
+      const items = dayItems(tasks, sharedOn(date));
+      const hol = holidayFor(date);
       if (inMonth) monthTasks.push(...tasks);
 
       const gd = date.getDate();
       const gregLabel = !compact && (gd === 1 || keyOf(date) === keyOf(monthStart)) ? `${gd} ב${MONTHS[date.getMonth()]}` : String(gd);
 
       const cell = el("div", {
-        class: "m-cell" + (inMonth ? "" : " out") + (keyOf(date) === todayKey ? " today" : ""),
+        class: "m-cell" + (inMonth ? "" : " out") + (keyOf(date) === todayKey ? " today" : "") + (hol && hol.major ? " yomtov" : ""),
         role: "button", tabindex: "0",
-        "aria-label": `יום ${DAY_NAMES[i]}, ${hebDate(date)}, ${gd}.${date.getMonth() + 1}, ${tasks.length ? tasks.length + " משימות" : "ריק"}`,
+        "aria-label": `יום ${DAY_NAMES[i]}, ${hebDate(date)}, ${gd}.${date.getMonth() + 1}${hol ? ", " + hol.name : ""}, ${items.length ? items.length + " משימות" : "ריק"}`,
         onclick: () => (compact ? jumpToDay(ws, i) : openDialog(wk, i)),
         onkeydown: (e) => { if (e.key === "Enter" && e.target === e.currentTarget) openDialog(wk, i); },
       }, el("span", { class: "m-top" },
         el("span", { class: "m-date" }, hebDay(date)),
         el("span", { class: "m-greg" }, gregLabel),
       ));
+      if (hol) cell.append(el("span", { class: "m-hol", title: hol.name }, compact ? "✦" : hol.name));
 
       if (compact) {
-        if (tasks.length) cell.append(el("span", { class: "m-dots" },
-          ...tasks.slice(0, 4).map((t) => el("i", { class: t.done ? "done" : "", style: `--cat:${catById(t.cat).color}` }))));
+        if (items.length) cell.append(el("span", { class: "m-dots" },
+          ...items.slice(0, 4).map((it) => el("i", {
+            class: it.e ? "shared" : it.t.done ? "done" : "",
+            style: `--cat:${catById((it.t || it.e).cat).color}`,
+          }))));
       } else {
         const MAX = 3;
         const list = el("ul", { class: "m-tasks" });
-        for (const t of tasks.slice(0, MAX)) {
+        for (const it of items.slice(0, MAX)) {
+          const x = it.t || it.e;
           list.append(el("li", {
-            class: "m-task" + (t.done ? " done" : ""), style: `--cat:${catById(t.cat).color}`, title: t.title,
-            onclick: (e) => { e.stopPropagation(); openDialog(wk, i, t.id); },
-          }, el("i", { class: "dot" }), el("span", {}, t.time ? `${t.time} ${t.title}` : t.title)));
+            class: "m-task" + (it.e ? " shared" : x.done ? " done" : ""),
+            style: `--cat:${catById(x.cat).color}`,
+            title: it.e ? `${x.title} · ${sharedWho(x)}` : x.title,
+            onclick: (e) => { e.stopPropagation(); it.e ? openShared(x.id) : openDialog(wk, i, x.id); },
+          }, el("i", { class: "dot" }), el("span", {}, x.time ? `${x.time} ${x.title}` : x.title)));
         }
-        if (tasks.length > MAX) {
+        if (items.length > MAX) {
           list.append(el("li", {
             class: "m-more",
             onclick: (e) => { e.stopPropagation(); jumpToDay(ws, i); },
-          }, `+${tasks.length - MAX} עוד`));
+          }, `+${items.length - MAX} עוד`));
         }
         cell.append(list);
       }
@@ -637,6 +778,50 @@ function renderMonth() {
     }
   }
   renderProgress(monthTasks, "month");
+}
+
+function taskItem(t, i) {
+  const cat = catById(t.cat);
+  return el("li", {
+    class: "task" + (t.done ? " done" : ""),
+    style: `--cat:${cat.color}`,
+    tabindex: "0",
+    onclick: () => openDialog(currentKey(), i, t.id),
+    onkeydown: (e) => { if (e.key === "Enter" && e.target === e.currentTarget) openDialog(currentKey(), i, t.id); },
+  },
+    el("button", {
+      class: "check", type: "button",
+      "aria-label": t.done ? "סימון כלא בוצע" : "סימון כבוצע",
+      onclick: (e) => { e.stopPropagation(); toggleTask(currentKey(), i, t.id, e); },
+    }, checkIcon()),
+    el("span", { class: "task-body" },
+      el("span", { class: "task-title" }, t.title),
+      el("span", { class: "task-meta" },
+        el("i", { class: "dot" }),
+        [t.time, cat.label].filter(Boolean).join(" · "),
+      ),
+    ),
+  );
+}
+
+function sharedItem(ev) {
+  const cat = catById(ev.cat);
+  return el("li", {
+    class: "task shared",
+    style: `--cat:${cat.color}`,
+    tabindex: "0",
+    onclick: () => openShared(ev.id),
+    onkeydown: (e) => { if (e.key === "Enter" && e.target === e.currentTarget) openShared(ev.id); },
+  },
+    el("span", { class: "share-badge", title: "אירוע משותף" }, peopleIcon()),
+    el("span", { class: "task-body" },
+      el("span", { class: "task-title" }, ev.title),
+      el("span", { class: "task-meta" },
+        el("i", { class: "dot" }),
+        [ev.time, sharedWho(ev)].filter(Boolean).join(" · "),
+      ),
+    ),
+  );
 }
 
 function renderWeek() {
@@ -653,36 +838,14 @@ function renderWeek() {
   for (let i = 0; i < 7; i++) {
     const date = addDays(weekStart, i);
     const isToday = keyOf(date) === todayKey;
-    const tasks = sortTasks(w.days[i]);
+    const items = dayItems(sortTasks(w.days[i]), sharedOn(date));
+    const hol = holidayFor(date);
 
     const list = el("ul", { class: "tasks" });
-    if (!tasks.length) list.append(el("li", { class: "empty" }, i === 6 ? "יום של מנוחה וים" : "עוד ריק כאן"));
+    if (!items.length) list.append(el("li", { class: "empty" }, i === 6 ? "יום של מנוחה וים" : "עוד ריק כאן"));
+    for (const it of items) list.append(it.t ? taskItem(it.t, i) : sharedItem(it.e));
 
-    for (const t of tasks) {
-      const cat = catById(t.cat);
-      list.append(el("li", {
-        class: "task" + (t.done ? " done" : ""),
-        style: `--cat:${cat.color}`,
-        tabindex: "0",
-        onclick: () => openDialog(currentKey(), i, t.id),
-        onkeydown: (e) => { if (e.key === "Enter" && e.target === e.currentTarget) openDialog(currentKey(), i, t.id); },
-      },
-        el("button", {
-          class: "check", type: "button",
-          "aria-label": t.done ? "סימון כלא בוצע" : "סימון כבוצע",
-          onclick: (e) => { e.stopPropagation(); toggleTask(currentKey(), i, t.id, e); },
-        }, checkIcon()),
-        el("span", { class: "task-body" },
-          el("span", { class: "task-title" }, t.title),
-          el("span", { class: "task-meta" },
-            el("i", { class: "dot" }),
-            [t.time, cat.label].filter(Boolean).join(" · "),
-          ),
-        ),
-      ));
-    }
-
-    days.append(el("article", { class: "day" + (isToday ? " today" : ""), "data-day": String(i) },
+    days.append(el("article", { class: "day" + (isToday ? " today" : "") + (hol && hol.major ? " yomtov" : ""), "data-day": String(i) },
       el("div", { class: "day-head" },
         el("span", {},
           el("span", { class: "day-name" }, DAY_NAMES[i]),
@@ -693,6 +856,7 @@ function renderWeek() {
           el("small", {}, `${date.getDate()}.${date.getMonth() + 1}`),
         ),
       ),
+      hol ? el("p", { class: "holiday" }, "✦ ", hol.name) : null,
       list,
       el("button", { class: "add-btn", type: "button", onclick: () => openDialog(currentKey(), i) }, "+ להוסיף"),
     ));
@@ -747,57 +911,186 @@ function toggleTask(wk, day, id, evt) {
 
 // dialog
 const dialog = $("taskDialog");
-let editing = null;
+let editing = null;      // { wk, day, id, sharedId, readonly }
 let selectedCat = "school";
+let shareEmails = [];
 
 function renderChips() {
   $("catChips").replaceChildren(...CATEGORIES.map((c) =>
     el("button", {
       type: "button", class: "chip", style: `--cat:${c.color}`,
       "aria-pressed": String(c.id === selectedCat),
+      disabled: Boolean(editing && editing.readonly),
       onclick: () => { selectedCat = c.id; renderChips(); },
     }, c.label)));
 }
 
+function renderEmails() {
+  const input = $("emailInput");
+  const ro = Boolean(editing && editing.readonly);
+  $("emailBox").replaceChildren(...shareEmails.map((addr) => el("span", { class: "email-chip" },
+    addr,
+    ro ? null : el("button", {
+      type: "button", "aria-label": `הסרת ${addr}`,
+      onclick: () => { shareEmails = shareEmails.filter((x) => x !== addr); renderEmails(); },
+    }, "✕"),
+  )), input);
+  input.hidden = ro;
+}
+
+// returns false if something typed isn't a valid email
+function addEmails(text) {
+  let ok = true;
+  for (const raw of text.split(/[\s,;]+/)) {
+    const addr = raw.trim().toLowerCase();
+    if (!addr) continue;
+    if (!EMAIL_RE.test(addr)) { ok = false; continue; }
+    if (addr === myEmail() || shareEmails.includes(addr) || shareEmails.length >= 20) continue;
+    shareEmails.push(addr);
+  }
+  renderEmails();
+  return ok;
+}
+
+function commitTypedEmail() {
+  const input = $("emailInput");
+  if (!input.value.trim()) return true;
+  if (!addEmails(input.value)) { toast("המייל הזה לא נראה תקין"); return false; }
+  input.value = "";
+  return true;
+}
+
+$("emailInput").addEventListener("keydown", (e) => {
+  if (["Enter", ",", ";", " "].includes(e.key)) { e.preventDefault(); commitTypedEmail(); }
+  else if (e.key === "Backspace" && !e.target.value && shareEmails.length) { shareEmails.pop(); renderEmails(); }
+});
+$("emailInput").addEventListener("blur", commitTypedEmail);
+
+// one place that fills the postcard for every case
+function fillDialog({ wk, day, title, time, cat, eyebrowNote, heading, emails, readonly, canDelete, deleteLabel, hint }) {
+  const date = addDays(parseKey(wk), day);
+  $("dialogDay").textContent = `יום ${DAY_NAMES[day]}, ${hebDate(date)} · ${date.getDate()}.${date.getMonth() + 1}${eyebrowNote ? " · " + eyebrowNote : ""}`;
+  $("dialogTitle").textContent = heading;
+  $("taskTitle").value = title || "";
+  $("taskTime").value = time || "";
+  $("taskDay").value = String(day);
+  if (cat) selectedCat = cat;
+  for (const id of ["taskTitle", "taskTime", "taskDay"]) $(id).disabled = readonly;
+  $("taskForm").classList.toggle("readonly", readonly);
+  $("saveTask").hidden = readonly;
+  $("cancelTask").textContent = readonly ? "סגירה" : "ביטול";
+  $("deleteTask").hidden = !canDelete;
+  $("deleteTask").textContent = deleteLabel || "מחיקה";
+
+  shareEmails = [...emails];
+  $("emailInput").value = "";
+  if (mode === "cloud") {
+    $("emailBox").hidden = false;
+    $("shareHint").textContent = hint || "היא תראה את זה כשתיכנס עם חשבון Google של המייל הזה";
+  } else {
+    $("emailBox").hidden = true;
+    $("shareHint").textContent = "כדי לשתף אירוע עם חברות צריך להיכנס עם Google";
+  }
+  renderChips();
+  renderEmails();
+  dialog.showModal();
+  if (!readonly) $("taskTitle").focus();
+}
+
 function openDialog(wk, day, id) {
   const t = id ? weekData(wk).days[day].find((x) => x.id === id) : null;
-  editing = { wk, day, id: t ? t.id : null };
-  const date = addDays(parseKey(wk), day);
-  $("dialogDay").textContent = `יום ${DAY_NAMES[day]}, ${hebDate(date)} · ${date.getDate()}.${date.getMonth() + 1}`;
-  $("dialogTitle").textContent = t ? "עריכת משימה" : "משימה חדשה";
-  $("taskTitle").value = t ? t.title : "";
-  $("taskTime").value = t ? t.time || "" : "";
-  $("taskDay").value = String(day);
-  if (t) selectedCat = t.cat;
-  $("deleteTask").hidden = !t;
-  renderChips();
-  dialog.showModal();
-  $("taskTitle").focus();
+  editing = { wk, day, id: t ? t.id : null, sharedId: null, readonly: false };
+  fillDialog({
+    wk, day, title: t && t.title, time: t && t.time, cat: t && t.cat,
+    heading: t ? "עריכת משימה" : "משימה חדשה",
+    emails: [], readonly: false, canDelete: Boolean(t),
+  });
 }
+
+function openShared(id) {
+  const ev = shared.find((x) => x.id === id);
+  if (!ev) return;
+  const date = parseKey(ev.date);
+  const wk = keyOf(startOfWeek(date));
+  const day = date.getDay();
+  const mine = ev.ownerUid === user.uid;
+  editing = { wk, day, id: null, sharedId: id, readonly: !mine };
+  const others = (ev.participants || []).filter((p) => p !== myEmail());
+  fillDialog({
+    wk, day, title: ev.title, time: ev.time, cat: ev.cat,
+    eyebrowNote: "משותף",
+    heading: mine ? "עריכת אירוע משותף" : "אירוע משותף",
+    emails: others, readonly: !mine, canDelete: true,
+    deleteLabel: mine ? "מחיקה לכולם" : "להסיר מהלוח שלי",
+    hint: mine ? null : `שותף איתך ע״י ${ev.ownerName || shortEmail(ev.ownerEmail)}`,
+  });
+}
+
+const sharedRef = (id) => fb.doc(fb.db, "shared", id);
+const oops = (msg) => (err) => { console.error(err); toast(msg); };
 
 $("taskForm").addEventListener("submit", (e) => {
   e.preventDefault();
+  if (!editing || editing.readonly) return;
+  if (!commitTypedEmail()) return;
   const title = $("taskTitle").value.trim();
-  if (!title || !editing) return;
-  const w = weekData(editing.wk);
-  let task;
-  if (editing.id) {
-    const list = w.days[editing.day];
-    const idx = list.findIndex((x) => x.id === editing.id);
-    if (idx >= 0) [task] = list.splice(idx, 1);
+  if (!title) return;
+  const time = $("taskTime").value;
+  const newDay = Number($("taskDay").value);
+  const date = addDays(parseKey(editing.wk), newDay);
+
+  if (mode === "cloud" && shareEmails.length) {
+    // save as a shared event
+    const data = {
+      title, time, cat: selectedCat, date: keyOf(date),
+      participants: [myEmail(), ...shareEmails],
+      ownerUid: user.uid, ownerEmail: myEmail(),
+      ownerName: (user.displayName || shortEmail(myEmail())).split(" ")[0],
+      updatedAt: fb.serverTimestamp(),
+    };
+    if (editing.sharedId) {
+      fb.updateDoc(sharedRef(editing.sharedId), data).catch(oops("העדכון לא הצליח"));
+    } else {
+      fb.addDoc(fb.collection(fb.db, "shared"), { ...data, createdAt: fb.serverTimestamp() }).catch(oops("השיתוף לא הצליח"));
+      if (editing.id) { // a personal task that just became shared
+        const w = weekData(editing.wk);
+        w.days[editing.day] = w.days[editing.day].filter((x) => x.id !== editing.id);
+        persist(editing.wk);
+      }
+      toast("האירוע שותף ✦");
+    }
+  } else {
+    // save as a personal task
+    const w = weekData(editing.wk);
+    let task;
+    if (editing.sharedId) {
+      fb.deleteDoc(sharedRef(editing.sharedId)).catch(oops("לא הצלחתי לבטל את השיתוף"));
+    } else if (editing.id) {
+      const list = w.days[editing.day];
+      const idx = list.findIndex((x) => x.id === editing.id);
+      if (idx >= 0) [task] = list.splice(idx, 1);
+    }
+    task = Object.assign(task || { id: uid(), done: false }, { title, time, cat: selectedCat });
+    w.days[newDay].push(task);
+    persist(editing.wk);
   }
-  task = Object.assign(task || { id: uid(), done: false }, { title, time: $("taskTime").value, cat: selectedCat });
-  w.days[Number($("taskDay").value)].push(task);
-  persist(editing.wk);
   dialog.close();
   render();
 });
 
 $("deleteTask").addEventListener("click", () => {
-  if (!editing || !editing.id) return;
-  const w = weekData(editing.wk);
-  w.days[editing.day] = w.days[editing.day].filter((x) => x.id !== editing.id);
-  persist(editing.wk);
+  if (!editing) return;
+  if (editing.sharedId) {
+    if (editing.readonly) {
+      fb.updateDoc(sharedRef(editing.sharedId), { participants: fb.arrayRemove(myEmail()) }).catch(oops("לא הצלחתי להסיר"));
+    } else {
+      fb.deleteDoc(sharedRef(editing.sharedId)).catch(oops("המחיקה לא הצליחה"));
+    }
+  } else if (editing.id) {
+    const w = weekData(editing.wk);
+    w.days[editing.day] = w.days[editing.day].filter((x) => x.id !== editing.id);
+    persist(editing.wk);
+  }
   dialog.close();
   render();
 });

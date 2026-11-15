@@ -220,11 +220,19 @@
         <div class="chips" id="catChips"></div>
       </div>
 
+      <div class="field share-field">
+        <span>לשתף עם</span>
+        <div class="emails" id="emailBox">
+          <input id="emailInput" type="email" inputmode="email" autocomplete="off" placeholder="מייל של חברה…" />
+        </div>
+        <small class="hint" id="shareHint"></small>
+      </div>
+
       <div class="dialog-actions">
         <button type="button" class="link-btn danger" id="deleteTask">מחיקה</button>
         <span class="spacer"></span>
         <button type="button" class="btn ghost" id="cancelTask">ביטול</button>
-        <button type="submit" class="btn primary">שמירה</button>
+        <button type="submit" class="btn primary" id="saveTask">שמירה</button>
       </div>
     </form>
   </dialog>

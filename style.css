@@ -283,6 +283,26 @@ body.locked .paper { display: none; }
 }
 .add-btn:hover { opacity: 1; text-decoration: underline wavy var(--coral) 1px; text-underline-offset: 6px; }
 
+/* holidays — quiet gold, never louder than the tasks */
+.holiday {
+  margin: -2px 0 8px; font-family: var(--f-display); font-size: .88rem; color: #ad8752; letter-spacing: .01em;
+}
+.day.yomtov { background: linear-gradient(180deg, #fcf2e1, var(--card) 45%); }
+.m-hol {
+  font-family: var(--f-display); font-size: .74rem; color: #ad8752; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; margin-top: -2px;
+}
+.m-cell.yomtov:not(.out) { background: linear-gradient(180deg, #fcf2e1, var(--card) 60%); }
+
+/* shared events */
+.share-badge {
+  flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--cat);
+  background: color-mix(in srgb, var(--cat) 16%, transparent);
+}
+.ppl { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.m-task.shared .dot, .m-dots i.shared { background: transparent; box-shadow: inset 0 0 0 1.5px var(--cat); }
+
 .day.flash { animation: flash 1.6s ease; }
 @keyframes flash { 25%, 60% { box-shadow: 0 0 0 4px rgba(217, 138, 116, .45), var(--shadow); } }
 
@@ -443,6 +463,30 @@ body[data-view="month"] .board { grid-template-columns: 1fr; }
 .chip[aria-pressed="true"] { background: var(--cat); color: #fffaf3; border-color: var(--cat); }
 .chip[aria-pressed="true"]::before { background: #fffaf3; }
 
+.emails {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0 6px;
+  border-bottom: 1px solid rgba(113, 135, 154, .35); transition: border-color .2s;
+}
+.emails[hidden] { display: none; }
+.emails:focus-within { border-bottom-color: var(--coral); }
+.field .emails input {
+  flex: 1; min-width: 150px; width: auto; border: none; padding: 4px 2px; font-size: 1rem;
+}
+.emails input[hidden] { display: none; }
+.email-chip {
+  display: inline-flex; align-items: center; gap: 2px; direction: ltr;
+  background: rgba(113, 135, 154, .14); border-radius: 99px; padding: 3px 4px 3px 10px; font-size: .85rem;
+}
+.email-chip button { border: none; background: none; padding: 0 5px; color: var(--muted); font-size: .8rem; }
+.email-chip button:hover { color: var(--coral); }
+.hint { font-size: .78rem; color: var(--muted); line-height: 1.4; }
+
+.postcard form.readonly .field input:disabled,
+.postcard form.readonly .field select:disabled { color: var(--ink); -webkit-text-fill-color: var(--ink); opacity: 1; border-bottom-style: dotted; }
+.chip:disabled { cursor: default; }
+.chip:disabled:not([aria-pressed="true"]) { opacity: .45; }
+.btn[hidden] { display: none; }
+
 .dialog-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .spacer { flex: 1; }
 .btn { border: none; border-radius: 99px; padding: 10px 22px; font-size: 1rem; }
@@ -497,6 +541,7 @@ body[data-view="month"] .board { grid-template-columns: 1fr; }
   .m-top { flex-direction: column; gap: 0; }
   .m-date { min-width: 26px; height: 24px; padding: 0 4px; font-size: .95rem; }
   .m-greg { font-size: .62rem; line-height: 1; }
+  .m-hol { font-size: .6rem; margin: 0; padding: 0; line-height: 1; }
   .row { flex-direction: column; gap: 16px; }
   .gate-card { padding: 32px 22px 24px; margin-top: -12vh; }
   .postcard form { padding: 24px 20px 18px; }

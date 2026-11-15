@@ -6,12 +6,14 @@ import { firebaseConfig } from "./firebase-config.js";
 const FIREBASE_CDN = "https://www.gstatic.com/firebasejs/10.12.2/";
 const LOCAL_KEY = "beachPlanner.v1";
 const MODE_KEY = "beachPlanner.mode";
+const VIEW_KEY = "beachPlanner.view";
 
 const FIREBASE_READY = Boolean(
   firebaseConfig && firebaseConfig.apiKey && !String(firebaseConfig.apiKey).startsWith("YOUR")
 );
 
 const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+const DAY_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 
 const CATEGORIES = [
@@ -215,7 +217,7 @@ let mode = null;        // "local" | "cloud"
 let cache = {};         // weekKey → week data
 let user = null;
 let fb = null;          // firebase functions + instances
-let unsubscribe = null;
+let unsubs = [];        // live listeners for the visible weeks
 const pending = new Map(); // weekKey → timeout id
 
 const blankWeek = () => ({ days: { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }, goals: [], note: "" });
@@ -247,13 +249,25 @@ const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { retur
 const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
 
 let weekStart = startOfWeek(new Date());
+let monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let view = lsGet(VIEW_KEY) === "month" ? "month" : "week";
 const currentKey = () => keyOf(weekStart);
+const parseKey = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
 
-function week() {
-  const k = currentKey();
+function weekData(k = currentKey()) {
   if (!cache[k]) cache[k] = blankWeek();
   return cache[k];
 }
+const week = () => weekData();
+
+// keys of every week row shown in the month grid
+function monthWeeks() {
+  const last = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  const keys = [];
+  for (let d = startOfWeek(monthStart); d <= last; d = addDays(d, 7)) keys.push(keyOf(d));
+  return keys;
+}
+const visibleKeys = () => (view === "month" ? monthWeeks() : [currentKey()]);
 
 const hasContent = (w) => Object.values(w.days).some((d) => d.length) || w.goals.length || w.note;
 
@@ -265,8 +279,7 @@ function cloudWrite(k) {
     .catch((e) => { console.error(e); toast("אופס, השמירה לא הצליחה"); setSync("השמירה נכשלה"); });
 }
 
-function persist() {
-  const k = currentKey();
+function persist(k = currentKey()) {
   if (mode === "local") { writeLocal(); return; }
   if (mode !== "cloud") return;
   setSync("שומר…");
@@ -281,19 +294,22 @@ function flushPending() {
 window.addEventListener("pagehide", flushPending);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushPending(); });
 
-function watchWeek() {
-  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+function stopWatching() { unsubs.forEach((u) => u()); unsubs = []; }
+
+function watchVisible() {
+  stopWatching();
   if (mode !== "cloud") return;
-  const k = currentKey();
-  unsubscribe = fb.onSnapshot(
-    fb.doc(fb.db, "users", user.uid, "weeks", k),
-    (snap) => {
-      if (pending.has(k)) return; // our own unsaved edits win
-      cache[k] = snap.exists() ? normalize(snap.data()) : (cache[k] || blankWeek());
-      if (currentKey() === k) render();
-    },
-    (err) => { console.error(err); setSync("אין חיבור לענן"); }
-  );
+  for (const k of visibleKeys()) {
+    unsubs.push(fb.onSnapshot(
+      fb.doc(fb.db, "users", user.uid, "weeks", k),
+      (snap) => {
+        if (pending.has(k)) return; // our own unsaved edits win
+        cache[k] = snap.exists() ? normalize(snap.data()) : (cache[k] || blankWeek());
+        if (visibleKeys().includes(k)) render();
+      },
+      (err) => { console.error(err); setSync("אין חיבור לענן"); }
+    ));
+  }
 }
 
 async function migrateLocalToCloud() {
@@ -346,10 +362,10 @@ async function initFirebase() {
       cache = {};
       await migrateLocalToCloud();
       enterApp();
-      watchWeek();
+      watchVisible();
     } else {
       user = null;
-      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      stopWatching();
       if (lsGet(MODE_KEY) === "local") enterLocal();
       else showGate();
     }
@@ -497,10 +513,93 @@ const checkIcon = () => {
    ===================================================== */
 function render() {
   if (!mode) return;
+  document.body.dataset.view = view;
+  document.querySelectorAll(".view-toggle button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.view === view)));
+  $("prevWeek").setAttribute("aria-label", view === "month" ? "חודש קודם" : "שבוע קודם");
+  $("nextWeek").setAttribute("aria-label", view === "month" ? "חודש הבא" : "שבוע הבא");
+  if (view === "month") renderMonth();
+  else renderWeek();
+}
+
+function renderProgress(all, scope) {
+  const done = all.filter((t) => t.done).length;
+  const STEPS = 12;
+  const lit = all.length ? Math.round((done / all.length) * STEPS) : 0;
+  const fpWrap = $("footprints");
+  if (fpWrap.children.length !== STEPS) fpWrap.replaceChildren(...Array.from({ length: STEPS }, footprintSVG));
+  [...fpWrap.children].forEach((n, idx) => n.classList.toggle("on", idx < lit));
+  $("progressText").textContent =
+    !all.length ? (scope === "month" ? "החודש עוד פתוח לגמרי" : "השביל עוד מחכה לצעד הראשון")
+    : done === all.length ? (scope === "month" ? "סיימת הכל החודש ✦" : "הגעת עד הים. סיימת הכל השבוע ✦")
+    : `${done} מתוך ${all.length} צעדים על החוף`;
+}
+
+function renderMonth() {
+  const y = monthStart.getFullYear();
+  const m = monthStart.getMonth();
+  const now = new Date();
+  const todayKey = keyOf(now);
+  const compact = matchMedia("(max-width: 640px)").matches;
+
+  $("weekRange").replaceChildren(el("span", {}, MONTHS[m]), el("small", {}, String(y)));
+  $("thisWeek").textContent = "חזרה לחודש הזה";
+  $("thisWeek").hidden = y === now.getFullYear() && m === now.getMonth();
+
+  const grid = $("month");
+  grid.replaceChildren(...DAY_NAMES.map((n, i) =>
+    el("div", { class: "m-head" }, el("span", { class: "long" }, n), el("span", { class: "short" }, DAY_SHORT[i]))));
+
+  const monthTasks = [];
+  for (const wk of monthWeeks()) {
+    const w = weekData(wk);
+    const ws = parseKey(wk);
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(ws, i);
+      const inMonth = date.getMonth() === m;
+      const tasks = sortTasks(w.days[i]);
+      if (inMonth) monthTasks.push(...tasks);
+
+      const cell = el("div", {
+        class: "m-cell" + (inMonth ? "" : " out") + (keyOf(date) === todayKey ? " today" : ""),
+        role: "button", tabindex: "0",
+        "aria-label": `יום ${DAY_NAMES[i]} ${date.getDate()}.${date.getMonth() + 1}, ${tasks.length ? tasks.length + " משימות" : "ריק"}`,
+        onclick: () => (compact ? jumpToDay(ws, i) : openDialog(wk, i)),
+        onkeydown: (e) => { if (e.key === "Enter" && e.target === e.currentTarget) openDialog(wk, i); },
+      }, el("span", { class: "m-date" }, String(date.getDate())));
+
+      if (compact) {
+        if (tasks.length) cell.append(el("span", { class: "m-dots" },
+          ...tasks.slice(0, 4).map((t) => el("i", { class: t.done ? "done" : "", style: `--cat:${catById(t.cat).color}` }))));
+      } else {
+        const MAX = 3;
+        const list = el("ul", { class: "m-tasks" });
+        for (const t of tasks.slice(0, MAX)) {
+          list.append(el("li", {
+            class: "m-task" + (t.done ? " done" : ""), style: `--cat:${catById(t.cat).color}`, title: t.title,
+            onclick: (e) => { e.stopPropagation(); openDialog(wk, i, t.id); },
+          }, el("i", { class: "dot" }), el("span", {}, t.time ? `${t.time} ${t.title}` : t.title)));
+        }
+        if (tasks.length > MAX) {
+          list.append(el("li", {
+            class: "m-more",
+            onclick: (e) => { e.stopPropagation(); jumpToDay(ws, i); },
+          }, `+${tasks.length - MAX} עוד`));
+        }
+        cell.append(list);
+      }
+      grid.append(cell);
+    }
+  }
+  renderProgress(monthTasks, "month");
+}
+
+function renderWeek() {
   const w = week();
   const todayKey = keyOf(new Date());
 
   $("weekRange").replaceChildren(...weekTitle(weekStart));
+  $("thisWeek").textContent = "חזרה לשבוע הזה";
   $("thisWeek").hidden = currentKey() === keyOf(startOfWeek(new Date()));
 
   // days
@@ -520,13 +619,13 @@ function render() {
         class: "task" + (t.done ? " done" : ""),
         style: `--cat:${cat.color}`,
         tabindex: "0",
-        onclick: () => openDialog(i, t.id),
-        onkeydown: (e) => { if (e.key === "Enter" && e.target === e.currentTarget) openDialog(i, t.id); },
+        onclick: () => openDialog(currentKey(), i, t.id),
+        onkeydown: (e) => { if (e.key === "Enter" && e.target === e.currentTarget) openDialog(currentKey(), i, t.id); },
       },
         el("button", {
           class: "check", type: "button",
           "aria-label": t.done ? "סימון כלא בוצע" : "סימון כבוצע",
-          onclick: (e) => { e.stopPropagation(); toggleTask(i, t.id, e); },
+          onclick: (e) => { e.stopPropagation(); toggleTask(currentKey(), i, t.id, e); },
         }, checkIcon()),
         el("span", { class: "task-body" },
           el("span", { class: "task-title" }, t.title),
@@ -538,7 +637,7 @@ function render() {
       ));
     }
 
-    days.append(el("article", { class: "day" + (isToday ? " today" : "") },
+    days.append(el("article", { class: "day" + (isToday ? " today" : ""), "data-day": String(i) },
       el("div", { class: "day-head" },
         el("span", {},
           el("span", { class: "day-name" }, DAY_NAMES[i]),
@@ -547,7 +646,7 @@ function render() {
         el("span", { class: "day-date" }, `${date.getDate()}.${date.getMonth() + 1}`),
       ),
       list,
-      el("button", { class: "add-btn", type: "button", onclick: () => openDialog(i) }, "+ להוסיף"),
+      el("button", { class: "add-btn", type: "button", onclick: () => openDialog(currentKey(), i) }, "+ להוסיף"),
     ));
   }
 
@@ -579,28 +678,17 @@ function render() {
   const note = $("note");
   if (document.activeElement !== note) note.value = w.note || "";
 
-  // footprints progress
-  const all = Object.values(w.days).flat();
-  const done = all.filter((t) => t.done).length;
-  const STEPS = 12;
-  const lit = all.length ? Math.round((done / all.length) * STEPS) : 0;
-  const fpWrap = $("footprints");
-  if (fpWrap.children.length !== STEPS) fpWrap.replaceChildren(...Array.from({ length: STEPS }, footprintSVG));
-  [...fpWrap.children].forEach((n, idx) => n.classList.toggle("on", idx < lit));
-  $("progressText").textContent =
-    !all.length ? "השביל עוד מחכה לצעד הראשון"
-    : done === all.length ? "הגעת עד הים. סיימת הכל השבוע ✦"
-    : `${done} מתוך ${all.length} צעדים על החוף`;
+  renderProgress(Object.values(w.days).flat(), "week");
 }
 
 /* =====================================================
    actions
    ===================================================== */
-function toggleTask(day, id, evt) {
-  const t = week().days[day].find((x) => x.id === id);
+function toggleTask(wk, day, id, evt) {
+  const t = weekData(wk).days[day].find((x) => x.id === id);
   if (!t) return;
   t.done = !t.done;
-  persist();
+  persist(wk);
   if (t.done) {
     const r = evt.currentTarget.getBoundingClientRect();
     sparkle(r.left + r.width / 2, r.top + r.height / 2);
@@ -623,10 +711,11 @@ function renderChips() {
     }, c.label)));
 }
 
-function openDialog(day, id) {
-  const t = id ? week().days[day].find((x) => x.id === id) : null;
-  editing = { day, id: t ? t.id : null };
-  $("dialogDay").textContent = `יום ${DAY_NAMES[day]}, ${addDays(weekStart, day).getDate()}.${addDays(weekStart, day).getMonth() + 1}`;
+function openDialog(wk, day, id) {
+  const t = id ? weekData(wk).days[day].find((x) => x.id === id) : null;
+  editing = { wk, day, id: t ? t.id : null };
+  const date = addDays(parseKey(wk), day);
+  $("dialogDay").textContent = `יום ${DAY_NAMES[day]}, ${date.getDate()}.${date.getMonth() + 1}`;
   $("dialogTitle").textContent = t ? "עריכת משימה" : "משימה חדשה";
   $("taskTitle").value = t ? t.title : "";
   $("taskTime").value = t ? t.time || "" : "";
@@ -642,7 +731,7 @@ $("taskForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const title = $("taskTitle").value.trim();
   if (!title || !editing) return;
-  const w = week();
+  const w = weekData(editing.wk);
   let task;
   if (editing.id) {
     const list = w.days[editing.day];
@@ -651,16 +740,16 @@ $("taskForm").addEventListener("submit", (e) => {
   }
   task = Object.assign(task || { id: uid(), done: false }, { title, time: $("taskTime").value, cat: selectedCat });
   w.days[Number($("taskDay").value)].push(task);
-  persist();
+  persist(editing.wk);
   dialog.close();
   render();
 });
 
 $("deleteTask").addEventListener("click", () => {
   if (!editing || !editing.id) return;
-  const w = week();
+  const w = weekData(editing.wk);
   w.days[editing.day] = w.days[editing.day].filter((x) => x.id !== editing.id);
-  persist();
+  persist(editing.wk);
   dialog.close();
   render();
 });
@@ -680,11 +769,60 @@ $("goalForm").addEventListener("submit", (e) => {
 });
 $("note").addEventListener("input", (e) => { week().note = e.target.value; persist(); });
 
-// week navigation
-function goWeek(date) { flushPending(); weekStart = date; watchWeek(); render(); }
-$("prevWeek").addEventListener("click", () => goWeek(addDays(weekStart, -7)));
-$("nextWeek").addEventListener("click", () => goWeek(addDays(weekStart, 7)));
-$("thisWeek").addEventListener("click", () => goWeek(startOfWeek(new Date())));
+// navigation (week or month)
+function refresh() { watchVisible(); render(); }
+
+function step(dir) {
+  flushPending();
+  if (view === "month") monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + dir, 1);
+  else weekStart = addDays(weekStart, 7 * dir);
+  refresh();
+}
+$("prevWeek").addEventListener("click", () => step(-1));
+$("nextWeek").addEventListener("click", () => step(1));
+$("thisWeek").addEventListener("click", () => {
+  flushPending();
+  const now = new Date();
+  weekStart = startOfWeek(now);
+  monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  refresh();
+});
+
+function setView(v) {
+  if (v === view) return;
+  flushPending();
+  const now = new Date();
+  if (v === "month") {
+    // show the month of the week we were looking at (today's month if it's this week)
+    const ref = currentKey() === keyOf(startOfWeek(now)) ? now : addDays(weekStart, 3);
+    monthStart = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  } else {
+    const sameMonth = monthStart.getFullYear() === now.getFullYear() && monthStart.getMonth() === now.getMonth();
+    weekStart = startOfWeek(sameMonth ? now : monthStart);
+  }
+  view = v;
+  lsSet(VIEW_KEY, v);
+  refresh();
+}
+document.querySelectorAll(".view-toggle button").forEach((b) =>
+  b.addEventListener("click", () => setView(b.dataset.view)));
+
+function jumpToDay(ws, day) {
+  flushPending();
+  view = "week";
+  lsSet(VIEW_KEY, "week");
+  weekStart = ws;
+  refresh();
+  requestAnimationFrame(() => {
+    const card = document.querySelector(`.day[data-day="${day}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+  });
+}
+
+// month cells switch between titles and dots at phone width
+matchMedia("(max-width: 640px)").addEventListener("change", () => { if (view === "month") render(); });
 
 // gate buttons
 $("googleBtn").addEventListener("click", signIn);
@@ -695,6 +833,7 @@ $("localBtn").addEventListener("click", enterLocal);
    ===================================================== */
 $("taskDay").replaceChildren(...DAY_NAMES.map((n, i) => el("option", { value: String(i) }, n)));
 $("quote").textContent = pick(QUOTES);
+$("year").textContent = String(new Date().getFullYear());
 buildScene();
 
 if (FIREBASE_READY) {

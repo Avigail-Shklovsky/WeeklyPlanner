@@ -152,6 +152,11 @@
         </button>
       </nav>
 
+      <div class="view-toggle" role="group" aria-label="תצוגה">
+        <button type="button" data-view="week" aria-pressed="true">שבוע</button>
+        <button type="button" data-view="month" aria-pressed="false">חודש</button>
+      </div>
+
       <div class="steps" aria-live="polite">
         <div class="footprints" id="footprints"></div>
         <p class="steps-text" id="progressText"></p>
@@ -160,6 +165,7 @@
 
     <div class="board">
       <section class="days" id="days"></section>
+      <section class="month" id="month" aria-label="לוח חודשי"></section>
 
       <aside class="side">
         <div class="card goals-card">
@@ -180,6 +186,9 @@
 
     <footer class="colophon">
       <span id="syncState"></span>
+      <p class="credit">
+        © <span id="year">2026</span> כל הזכויות שמורות ל־<a href="https://www.linkedin.com/in/avigail-shklovsky-55807a419/" target="_blank" rel="noopener noreferrer"><bdi>Avigail Shklovsky</bdi></a>
+      </p>
     </footer>
   </main>
 

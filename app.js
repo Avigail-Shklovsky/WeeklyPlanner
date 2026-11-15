@@ -45,6 +45,43 @@ const pad = (n) => String(n).padStart(2, "0");
 const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const startOfWeek = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, -x.getDay()); };
+// ---- Hebrew calendar (built into the browser's Intl) ----
+const HEB_FMT = new Intl.DateTimeFormat("he-u-ca-hebrew-nu-latn", { day: "numeric", month: "long", year: "numeric" });
+const hebCache = new Map();
+function heb(d) {
+  const k = keyOf(d);
+  let v = hebCache.get(k);
+  if (!v) {
+    const p = {};
+    for (const part of HEB_FMT.formatToParts(d)) if (part.type !== "literal") p[part.type] = part.value;
+    v = { day: Number(p.day), month: p.month, year: Number(p.year) };
+    hebCache.set(k, v);
+  }
+  return v;
+}
+function gematria(n) {
+  const ones = ["", "א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט"];
+  const tens = ["", "י", "כ", "ל", "מ", "נ", "ס", "ע", "פ", "צ"];
+  const hundreds = ["", "ק", "ר", "ש", "ת", "תק", "תר", "תש", "תת", "תתק"];
+  n %= 1000;
+  const r = n % 100;
+  let s = hundreds[Math.floor(n / 100)];
+  s += r === 15 ? "טו" : r === 16 ? "טז" : tens[Math.floor(r / 10)] + ones[r % 10];
+  return s.length === 1 ? s + "׳" : s.slice(0, -1) + "״" + s.slice(-1);
+}
+const hebDay = (d) => gematria(heb(d).day);
+const hebYear = (d) => gematria(heb(d).year);
+const hebDate = (d) => `${hebDay(d)} ב${heb(d).month}`;
+const firstOfHebMonth = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, 1 - heb(x).day); };
+const nextHebMonth = (first) => firstOfHebMonth(addDays(first, 30)); // months are 29–30 days
+const prevHebMonth = (first) => firstOfHebMonth(addDays(first, -1));
+
+// "15–21 בנובמבר 2026" (numbers isolated so they don't flip in RTL)
+function gregRange(a, b) {
+  if (a.getMonth() === b.getMonth()) return `⁦${a.getDate()}–${b.getDate()}⁩ ב${MONTHS[a.getMonth()]} ${b.getFullYear()}`;
+  return `${a.getDate()} ב${MONTHS[a.getMonth()]} – ${b.getDate()} ב${MONTHS[b.getMonth()]} ${b.getFullYear()}`;
+}
+
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -249,7 +286,7 @@ const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { retur
 const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
 
 let weekStart = startOfWeek(new Date());
-let monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let monthStart = firstOfHebMonth(new Date()); // first day of a Hebrew month
 let view = lsGet(VIEW_KEY) === "month" ? "month" : "week";
 const currentKey = () => keyOf(weekStart);
 const parseKey = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -262,7 +299,7 @@ const week = () => weekData();
 
 // keys of every week row shown in the month grid
 function monthWeeks() {
-  const last = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  const last = addDays(nextHebMonth(monthStart), -1);
   const keys = [];
   for (let d = startOfWeek(monthStart); d <= last; d = addDays(d, 7)) keys.push(keyOf(d));
   return keys;
@@ -484,19 +521,13 @@ function footprintSVG() {
 
 function weekTitle(start) {
   const end = addDays(start, 6);
-  const range = el("span", { dir: "ltr" });
-  let monthText;
-  if (start.getMonth() === end.getMonth()) {
-    range.textContent = `${start.getDate()}–${end.getDate()}`;
-    monthText = ` ב${MONTHS[start.getMonth()]}`;
-  } else {
-    range.textContent = "";
-    return [
-      el("span", {}, `${start.getDate()} ב${MONTHS[start.getMonth()]} – ${end.getDate()} ב${MONTHS[end.getMonth()]}`),
-      el("small", {}, String(end.getFullYear())),
-    ];
-  }
-  return [el("span", {}, range, monthText), el("small", {}, String(end.getFullYear()))];
+  const primary = heb(start).month === heb(end).month
+    ? `${hebDay(start)}–${hebDay(end)} ב${heb(start).month}`
+    : `${hebDate(start)} – ${hebDate(end)}`;
+  return [
+    el("span", {}, primary),
+    el("small", {}, el("b", {}, hebYear(end)), " · ", gregRange(start, end)),
+  ];
 }
 
 const sortTasks = (list) => [...list].sort((a, b) => (a.time || "99:99").localeCompare(b.time || "99:99"));
@@ -536,15 +567,23 @@ function renderProgress(all, scope) {
 }
 
 function renderMonth() {
-  const y = monthStart.getFullYear();
-  const m = monthStart.getMonth();
   const now = new Date();
   const todayKey = keyOf(now);
   const compact = matchMedia("(max-width: 640px)").matches;
+  const next = nextHebMonth(monthStart);
+  const last = addDays(next, -1);
 
-  $("weekRange").replaceChildren(el("span", {}, MONTHS[m]), el("small", {}, String(y)));
+  // Hebrew month is the headline; the Gregorian months it overlaps are secondary
+  const ga = monthStart, gb = last;
+  const greg = ga.getMonth() === gb.getMonth() ? `${MONTHS[ga.getMonth()]} ${ga.getFullYear()}`
+    : ga.getFullYear() === gb.getFullYear() ? `${MONTHS[ga.getMonth()]}–${MONTHS[gb.getMonth()]} ${gb.getFullYear()}`
+    : `${MONTHS[ga.getMonth()]} ${ga.getFullYear()} – ${MONTHS[gb.getMonth()]} ${gb.getFullYear()}`;
+  $("weekRange").replaceChildren(
+    el("span", {}, heb(monthStart).month),
+    el("small", {}, el("b", {}, hebYear(monthStart)), " · ", greg),
+  );
   $("thisWeek").textContent = "חזרה לחודש הזה";
-  $("thisWeek").hidden = y === now.getFullYear() && m === now.getMonth();
+  $("thisWeek").hidden = keyOf(monthStart) === keyOf(firstOfHebMonth(now));
 
   const grid = $("month");
   grid.replaceChildren(...DAY_NAMES.map((n, i) =>
@@ -556,17 +595,23 @@ function renderMonth() {
     const ws = parseKey(wk);
     for (let i = 0; i < 7; i++) {
       const date = addDays(ws, i);
-      const inMonth = date.getMonth() === m;
+      const inMonth = date >= monthStart && date < next;
       const tasks = sortTasks(w.days[i]);
       if (inMonth) monthTasks.push(...tasks);
+
+      const gd = date.getDate();
+      const gregLabel = !compact && (gd === 1 || keyOf(date) === keyOf(monthStart)) ? `${gd} ב${MONTHS[date.getMonth()]}` : String(gd);
 
       const cell = el("div", {
         class: "m-cell" + (inMonth ? "" : " out") + (keyOf(date) === todayKey ? " today" : ""),
         role: "button", tabindex: "0",
-        "aria-label": `יום ${DAY_NAMES[i]} ${date.getDate()}.${date.getMonth() + 1}, ${tasks.length ? tasks.length + " משימות" : "ריק"}`,
+        "aria-label": `יום ${DAY_NAMES[i]}, ${hebDate(date)}, ${gd}.${date.getMonth() + 1}, ${tasks.length ? tasks.length + " משימות" : "ריק"}`,
         onclick: () => (compact ? jumpToDay(ws, i) : openDialog(wk, i)),
         onkeydown: (e) => { if (e.key === "Enter" && e.target === e.currentTarget) openDialog(wk, i); },
-      }, el("span", { class: "m-date" }, String(date.getDate())));
+      }, el("span", { class: "m-top" },
+        el("span", { class: "m-date" }, hebDay(date)),
+        el("span", { class: "m-greg" }, gregLabel),
+      ));
 
       if (compact) {
         if (tasks.length) cell.append(el("span", { class: "m-dots" },
@@ -643,7 +688,10 @@ function renderWeek() {
           el("span", { class: "day-name" }, DAY_NAMES[i]),
           isToday ? el("span", { class: "today-tag" }, "היום") : null,
         ),
-        el("span", { class: "day-date" }, `${date.getDate()}.${date.getMonth() + 1}`),
+        el("span", { class: "day-date" },
+          el("span", { class: "heb" }, hebDate(date)),
+          el("small", {}, `${date.getDate()}.${date.getMonth() + 1}`),
+        ),
       ),
       list,
       el("button", { class: "add-btn", type: "button", onclick: () => openDialog(currentKey(), i) }, "+ להוסיף"),
@@ -715,7 +763,7 @@ function openDialog(wk, day, id) {
   const t = id ? weekData(wk).days[day].find((x) => x.id === id) : null;
   editing = { wk, day, id: t ? t.id : null };
   const date = addDays(parseKey(wk), day);
-  $("dialogDay").textContent = `יום ${DAY_NAMES[day]}, ${date.getDate()}.${date.getMonth() + 1}`;
+  $("dialogDay").textContent = `יום ${DAY_NAMES[day]}, ${hebDate(date)} · ${date.getDate()}.${date.getMonth() + 1}`;
   $("dialogTitle").textContent = t ? "עריכת משימה" : "משימה חדשה";
   $("taskTitle").value = t ? t.title : "";
   $("taskTime").value = t ? t.time || "" : "";
@@ -774,7 +822,7 @@ function refresh() { watchVisible(); render(); }
 
 function step(dir) {
   flushPending();
-  if (view === "month") monthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + dir, 1);
+  if (view === "month") monthStart = dir > 0 ? nextHebMonth(monthStart) : prevHebMonth(monthStart);
   else weekStart = addDays(weekStart, 7 * dir);
   refresh();
 }
@@ -784,7 +832,7 @@ $("thisWeek").addEventListener("click", () => {
   flushPending();
   const now = new Date();
   weekStart = startOfWeek(now);
-  monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  monthStart = firstOfHebMonth(now);
   refresh();
 });
 
@@ -795,9 +843,9 @@ function setView(v) {
   if (v === "month") {
     // show the month of the week we were looking at (today's month if it's this week)
     const ref = currentKey() === keyOf(startOfWeek(now)) ? now : addDays(weekStart, 3);
-    monthStart = new Date(ref.getFullYear(), ref.getMonth(), 1);
+    monthStart = firstOfHebMonth(ref);
   } else {
-    const sameMonth = monthStart.getFullYear() === now.getFullYear() && monthStart.getMonth() === now.getMonth();
+    const sameMonth = keyOf(monthStart) === keyOf(firstOfHebMonth(now));
     weekStart = startOfWeek(sameMonth ? now : monthStart);
   }
   view = v;

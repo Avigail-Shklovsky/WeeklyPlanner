@@ -202,7 +202,8 @@ body.locked .paper { display: none; }
 #weekRange {
   font-family: var(--f-display); font-weight: 500; font-size: 1.9rem; margin: 0; line-height: 1.15;
 }
-#weekRange small { display: block; font-family: var(--f-hand); font-size: 1.3rem; color: var(--muted); font-weight: 700; }
+#weekRange small { display: block; margin-top: 4px; font-family: var(--f-body); font-size: .85rem; color: var(--muted); font-weight: 400; letter-spacing: .02em; }
+#weekRange small b { font-family: var(--f-display); font-weight: 500; font-size: .95rem; color: var(--ink-soft); }
 
 .round-btn {
   width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
@@ -247,7 +248,9 @@ body.locked .paper { display: none; }
 .day-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
 .day-name { font-family: var(--f-display); font-weight: 500; font-size: 1.55rem; }
 .today-tag { font-family: var(--f-hand); font-weight: 700; font-size: 1.35rem; color: var(--coral); margin-inline-start: 8px; }
-.day-date { font-family: var(--f-hand); font-weight: 700; font-size: 1.4rem; color: var(--muted); }
+.day-date { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; text-align: left; }
+.day-date .heb { font-family: var(--f-display); font-size: 1.05rem; color: var(--ink-soft); }
+.day-date small { font-size: .74rem; color: var(--muted); letter-spacing: .03em; }
 
 .tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .empty { font-family: var(--f-hand); font-size: 1.4rem; color: #b9adb2; text-align: center; padding: 22px 0 10px; }
@@ -316,10 +319,12 @@ body[data-view="month"] .board { grid-template-columns: 1fr; }
 .m-cell.out { background: transparent; box-shadow: none; border-style: dashed; opacity: .5; }
 .m-cell.today { box-shadow: 0 0 0 2px rgba(217, 138, 116, .35), var(--shadow); }
 
+.m-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .m-date {
-  flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%;
+  flex: none; min-width: 30px; height: 30px; padding: 0 6px; display: grid; place-items: center; border-radius: 99px;
   font-family: var(--f-display); font-size: 1.15rem;
 }
+.m-greg { font-size: .74rem; color: var(--muted); white-space: nowrap; }
 .m-cell.today .m-date { background: var(--coral); color: #fffaf3; }
 
 .m-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -489,7 +494,9 @@ body[data-view="month"] .board { grid-template-columns: 1fr; }
   .m-head .long { display: none; }
   .m-head .short { display: inline; }
   .m-cell { min-height: 60px; padding: 5px 2px; align-items: center; border-radius: 10px; }
-  .m-date { width: 26px; height: 26px; font-size: 1rem; }
+  .m-top { flex-direction: column; gap: 0; }
+  .m-date { min-width: 26px; height: 24px; padding: 0 4px; font-size: .95rem; }
+  .m-greg { font-size: .62rem; line-height: 1; }
   .row { flex-direction: column; gap: 16px; }
   .gate-card { padding: 32px 22px 24px; margin-top: -12vh; }
   .postcard form { padding: 24px 20px 18px; }

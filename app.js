@@ -441,18 +441,41 @@ const myEmail = () => ((user && user.email) || "").toLowerCase();
 const shortEmail = (e) => String(e || "").split("@")[0];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+let sharedRetry = null;
+let sharedRetryDelay = 2000;
+
 function stopShared() {
+  clearTimeout(sharedRetry); sharedRetry = null;
   if (sharedUnsub) { sharedUnsub(); sharedUnsub = null; }
   shared = [];
 }
+// Firestore listeners stop for good after an error (e.g. rules not published yet),
+// so keep retrying with a growing delay instead of silently going blind.
 function watchShared() {
-  stopShared();
-  if (mode !== "cloud" || !myEmail()) return;
+  clearTimeout(sharedRetry); sharedRetry = null;
+  if (sharedUnsub) { sharedUnsub(); sharedUnsub = null; }
+  if (mode !== "cloud" || !myEmail()) { shared = []; return; }
   const q = fb.query(fb.collection(fb.db, "shared"), fb.where("participants", "array-contains", myEmail()));
   sharedUnsub = fb.onSnapshot(q,
-    (snap) => { shared = snap.docs.map((d) => ({ id: d.id, ...d.data() })); render(); },
-    (err) => { console.error("shared events", err); });
+    (snap) => {
+      sharedRetryDelay = 2000;
+      shared = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      render();
+    },
+    (err) => {
+      console.error("shared events", err);
+      sharedUnsub = null;
+      sharedRetry = setTimeout(watchShared, sharedRetryDelay);
+      sharedRetryDelay = Math.min(sharedRetryDelay * 2, 60000);
+    });
 }
+// coming back to the tab: reconnect right away if the listener is down
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && mode === "cloud" && !sharedUnsub) {
+    sharedRetryDelay = 2000;
+    watchShared();
+  }
+});
 const sharedOn = (date) => { const k = keyOf(date); return shared.filter((e) => e.date === k); };
 
 async function migrateLocalToCloud() {
@@ -1051,7 +1074,9 @@ $("taskForm").addEventListener("submit", (e) => {
     if (editing.sharedId) {
       fb.updateDoc(sharedRef(editing.sharedId), data).catch(oops("העדכון לא הצליח"));
     } else {
-      fb.addDoc(fb.collection(fb.db, "shared"), { ...data, createdAt: fb.serverTimestamp() }).catch(oops("השיתוף לא הצליח"));
+      fb.addDoc(fb.collection(fb.db, "shared"), { ...data, createdAt: fb.serverTimestamp() })
+        .then(() => { if (!sharedUnsub) watchShared(); })
+        .catch(oops("השיתוף לא הצליח"));
       if (editing.id) { // a personal task that just became shared
         const w = weekData(editing.wk);
         w.days[editing.day] = w.days[editing.day].filter((x) => x.id !== editing.id);

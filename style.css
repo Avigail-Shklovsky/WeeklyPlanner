@@ -287,6 +287,11 @@ body.locked .paper { display: none; }
 .holiday {
   margin: -2px 0 8px; font-family: var(--f-display); font-size: .88rem; color: #ad8752; letter-spacing: .01em;
 }
+.shabbat {
+  margin: -2px 0 8px; font-family: var(--f-hand); font-weight: 700; font-size: 1.55rem; line-height: 1;
+  color: #9a7f9a; letter-spacing: .02em;
+}
+.shabbat + .holiday { margin-top: -4px; }
 .day.yomtov { background: linear-gradient(180deg, #fcf2e1, var(--card) 45%); }
 .m-hol {
   font-family: var(--f-display); font-size: .74rem; color: #ad8752; line-height: 1.2;

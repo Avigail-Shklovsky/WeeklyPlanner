@@ -865,7 +865,7 @@ function renderWeek() {
     const hol = holidayFor(date);
 
     const list = el("ul", { class: "tasks" });
-    if (!items.length) list.append(el("li", { class: "empty" }, i === 6 ? "יום של מנוחה וים" : "עוד ריק כאן"));
+    if (!items.length) list.append(el("li", { class: "empty" }, i === 6 ? "יש מקום גם לדברים שקטים, כמו ללמוד" : "עוד ריק כאן"));
     for (const it of items) list.append(it.t ? taskItem(it.t, i) : sharedItem(it.e));
 
     days.append(el("article", { class: "day" + (isToday ? " today" : "") + (hol && hol.major ? " yomtov" : ""), "data-day": String(i) },
@@ -879,6 +879,7 @@ function renderWeek() {
           el("small", {}, `${date.getDate()}.${date.getMonth() + 1}`),
         ),
       ),
+      i === 6 ? el("p", { class: "shabbat" }, "שבת שלום") : null,
       hol ? el("p", { class: "holiday" }, "✦ ", hol.name) : null,
       list,
       el("button", { class: "add-btn", type: "button", onclick: () => openDialog(currentKey(), i) }, "+ להוסיף"),

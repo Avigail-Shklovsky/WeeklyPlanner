@@ -58,10 +58,10 @@ body.locked .hero { height: 100vh; height: 100svh; }
 .glow { animation: breathe 7s ease-in-out infinite alternate; transform-origin: 900px 300px; }
 @keyframes breathe { to { transform: scale(1.08); opacity: .85; } }
 
-.birds { animation: birds 50s linear infinite; }
+.birds { animation: birds 160s linear infinite; }
 @keyframes birds { from { transform: translate(-80px, 10px); } to { transform: translate(700px, -40px); } }
-.bird { animation: flap 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-.b2 { animation-delay: -.5s; } .b3 { animation-delay: -.9s; }
+.bird { animation: flap 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.b2 { animation-delay: -1.3s; } .b3 { animation-delay: -2.4s; }
 @keyframes flap { 50% { transform: scaleY(.45); } }
 
 .glint { animation: twinkle 3.2s ease-in-out infinite; }
